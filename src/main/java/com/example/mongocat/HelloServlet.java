@@ -113,7 +113,7 @@ public class HelloServlet extends HttpServlet {
                     .forEach(new Consumer<GridFSFile>() {
                         @Override
                         public void accept(final GridFSFile gridFSFile) {
-                            System.out.println("\n\nFOLLOWING IS IMPORTANT:\n\n");
+                            System.out.println("\n\nFOLLOWING IS IMPORTANT: \n\n");
 
                             InputStream in = gridFSBucket.openDownloadStream(fileId).batchSize(1); //1mb, first chunk
 
