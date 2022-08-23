@@ -1,0 +1,30 @@
+<component name="ArtifactManager">
+  <artifact type="exploded-war" name="MongoCat:war exploded">
+    <output-path>$PROJECT_DIR$/target/MongoCat-1.0-SNAPSHOT</output-path>
+    <properties id="maven-jee-properties">
+      <options>
+        <exploded>true</exploded>
+        <module>MongoCat</module>
+        <packaging>war</packaging>
+      </options>
+    </properties>
+    <root id="root">
+      <element id="directory" name="WEB-INF">
+        <element id="directory" name="classes">
+          <element id="module-output" name="MongoCat" />
+        </element>
+        <element id="directory" name="lib">
+          <element id="library" level="project" name="Maven: org.mongodb:mongodb-driver-sync:4.7.1" />
+          <element id="library" level="project" name="Maven: org.mongodb:bson:4.7.1" />
+          <element id="library" level="project" name="Maven: org.mongodb:mongodb-driver-core:4.7.1" />
+          <element id="library" level="project" name="Maven: org.mongodb:bson-record-codec:4.7.1" />
+          <element id="library" level="project" name="Maven: org.mongodb:mongodb-driver-legacy:4.7.1" />
+        </element>
+      </element>
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/target/MongoCat-1.0-SNAPSHOT/META-INF/MANIFEST.MF" />
+      </element>
+      <element id="javaee-facet-resources" facet="MongoCat/web/Web" />
+    </root>
+  </artifact>
+</component>
