@@ -36,7 +36,7 @@ public class DeleteFileServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("my_database");
+        MongoDatabase database = client.getDatabase("samples");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
 
         String url = request.getQueryString();

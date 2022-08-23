@@ -3,15 +3,16 @@ package com.example.mongocat;
 import com.mongodb.client.*;
 import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSBuckets;
-import com.mongodb.client.gridfs.model.GridFSFile;
 import com.mongodb.client.gridfs.model.GridFSUploadOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.InsertOneResult;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import com.mongodb.client.model.Filters;
 
 import java.io.*;
-import java.util.function.Consumer;
+import java.util.Iterator;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
 import javax.servlet.annotation.*;
@@ -93,43 +94,90 @@ public class HelloServlet extends HttpServlet {
         Part filePart = req.getPart("file");
         String fileName = filePart.getSubmittedFileName();
 
-        System.out.println("Establishing connection to database...");
+        System.out.println("Establishing connection to \"samples\" database...");
 
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("my_database");
+        MongoDatabase database = client.getDatabase("samples");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
+
+
+        ObjectId fileId = new ObjectId();
+
+        System.out.println("BEFORE: " + fileId);
+
+        ObjectId patientId = new ObjectId();
+        ObjectId vioId = new ObjectId();
 
         System.out.println("Currently uploading to database...");
         try (InputStream streamToUploadFrom = filePart.getInputStream()) {
             GridFSUploadOptions options = new GridFSUploadOptions()
                     .chunkSizeBytes(1048576) //1mb
-                    .metadata(new Document("type", fileName));
-            ObjectId fileId = gridFSBucket.uploadFromStream(fileName, streamToUploadFrom, options);
+                    .metadata(new Document("type", fileName)
+                            .append("patientId", patientId.toHexString()) //connection to patient object
+                            .append("vioId", vioId.toHexString())); //connection to vio
+            fileId = gridFSBucket.uploadFromStream(fileName, streamToUploadFrom, options);
             System.out.println("The file id of the uploaded file is: " + fileId.toHexString());
-
-
-            Bson query = Filters.eq("_id", fileId);
-            gridFSBucket.find(query)
-                    .forEach(new Consumer<GridFSFile>() {
-                        @Override
-                        public void accept(final GridFSFile gridFSFile) {
-                            System.out.println("\n\nFOLLOWING IS IMPORTANT: \n\n");
-
-                            InputStream in = gridFSBucket.openDownloadStream(fileId).batchSize(1); //1mb, first chunk
-
-                            try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-                                String temp = br.readLine();
-                                while (temp.charAt(0) == '#' && temp.charAt(1) == '#') {
-                                    System.out.println(temp); //do something
-                                    temp = br.readLine();
-                                }
-                            } catch (IOException e) {
-                                System.err.println("The header extraction failed: " + e.getMessage());
-                            }
-                        }
-                    });
         } catch (Exception e) {
-            System.err.println("The file upload failed: " + e);
+            System.err.println("ERROR: " + e.getMessage());
+        }
+
+        System.out.println("Beginning extraction of header-data...");
+        //EXTRACTION OF HEADER DATA
+
+        InputStream in = gridFSBucket.openDownloadStream(fileId).batchSize(1); //1mb, first chunk
+        StringBuilder sb = new StringBuilder();
+
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
+            String temp = br.readLine();
+            while (temp.charAt(0) == '#' && temp.charAt(1) == '#') {
+                sb.append(temp.substring(2));
+                sb.append("\n");
+                temp = br.readLine();
+            }
+        } catch (IOException e) {
+            System.err.println("The header extraction failed: " + e.getMessage());
+        }
+
+        try {
+            System.out.println("Connecting to \"patients\" database...");
+            database = client.getDatabase("patients");
+
+            MongoIterable<String> iterable = database.listCollectionNames();
+            Iterator<String> iterator = iterable.iterator();
+
+            String[] arr = fileName.split("\\.");
+            //patient-object automatically created when not yet existing
+            boolean equal = false;
+            while(iterator.hasNext()) {
+                if(iterator.next().equals(arr[0])) {
+                    equal = true;
+                    break;
+                }
+            }
+            if(!equal)
+                database.createCollection(arr[0]);
+
+            MongoCollection<Document> collection = database.getCollection(arr[0]);
+
+            Document patientinfo = new Document().append("_id", patientId.toHexString());
+            patientinfo.append("input", sb.toString());
+            patientinfo.append("sampleinfo", fileId.toHexString()); //connection to sample
+            collection.insertOne(patientinfo);
+
+            System.out.println("Connecting to \"vios\" database...");
+            database = client.getDatabase("vios");
+
+            if(!equal)
+                database.createCollection(arr[0]);
+            collection = database.getCollection(arr[0]);
+
+            Document vio = new Document().append("_id", vioId.toHexString());
+            vio.append("info", sb.toString());
+            collection.insertOne(vio);
+
+            System.out.println("All successful...");
+        } catch (Exception e) {
+            System.err.println("ERROR: " + e.getMessage());
         }
     }
 }
