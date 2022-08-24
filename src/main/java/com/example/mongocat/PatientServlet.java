@@ -42,12 +42,8 @@ public class PatientServlet extends HttpServlet {
                 ObjectId id = (ObjectId) doc.get("sample_" + i);
                 Document sample = samples.find(Filters.eq("_id", id)).first();
                 assert sample != null; //safety measure
-                Document docco = (Document) sample.get("metadata");
-                System.out.println(docco.toString());
-                ObjectId temp = docco.getObjectId("vioId");
-                System.out.println(temp.toHexString());
-                Document vio = versionInfo.find(Filters.eq("_id", temp)).first();
-                System.out.println(vio);
+                Document vio = versionInfo.find(Filters.eq("_id",
+                        ((Document) sample.get("metadata")).getObjectId("vioId"))).first();
                 assert vio != null; //safety measure
                 out.println("<p>" +
                         "&emsp; <b>date:</b>&emsp;" + sample.get("uploadDate") + "<br>" +

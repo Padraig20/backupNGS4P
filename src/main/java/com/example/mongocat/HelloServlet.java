@@ -106,6 +106,8 @@ public class HelloServlet extends HttpServlet {
 
         System.out.println("Establishing connection to database...");
 
+
+
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
         MongoDatabase database = client.getDatabase("database");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
@@ -142,6 +144,7 @@ public class HelloServlet extends HttpServlet {
 
         System.out.println("Currently uploading to database...");
         try (InputStream streamToUploadFrom = filePart.getInputStream()) {
+            //BufferedReader br = new BufferedReader(new InputStreamReader(streamToUploadFrom));
             GridFSUploadOptions options = new GridFSUploadOptions()
                     .chunkSizeBytes(1048576) //1mb
                     .metadata(new Document("type", fileName)
@@ -210,10 +213,6 @@ public class HelloServlet extends HttpServlet {
             if(!equal)
                 database.createCollection("vios");
             collection = database.getCollection("vios");
-
-            //Document oldVio = collection.find(Filters.and(Filters.eq("db_version", vio.get("db_version")),
-            //        Filters.eq("HIS_version", vio.get("HIS_version")))).first();
-
             collection.insertOne(vio);
 
             System.out.println("All successful...");
