@@ -62,6 +62,12 @@ public class HelloServlet extends HttpServlet {
                 "    View\n" +
                 "</button>");
 
+        //print patients form
+        out.println("<h4>Manage your patients</h4>\n" +
+                "<button onclick=\"window.location.href='http://localhost:8080/MongoCat_war_exploded/patients';\">\n" +
+                "    View\n" +
+                "</button>");
+
         //search form
         out.println("<h4>Search your files</h4>\n" +
                 "\n" +
@@ -98,24 +104,49 @@ public class HelloServlet extends HttpServlet {
         Part filePart = req.getPart("file");
         String fileName = filePart.getSubmittedFileName();
 
-        System.out.println("Establishing connection to \"samples\" database...");
+        System.out.println("Establishing connection to database...");
 
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("samples");
+        MongoDatabase database = client.getDatabase("database");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
 
-        //create IDs
+        //create IDs; PATIENT ONLY IF NECESSARY, CONNECT TO PATIENTS COLLECTION FIRST
         ObjectId fileId = new ObjectId();
-        ObjectId patientId = new ObjectId();
         ObjectId vioId = new ObjectId();
+
+        System.out.println("Connecting to \"patients\" collection...");
+
+        String[] arr = fileName.split("\\.");
+
+        //patient-collection automatically created when not yet existing
+        MongoIterable<String> iterable = database.listCollectionNames();
+        Iterator<String> iterator = iterable.iterator();
+        boolean equal = false;
+        while(iterator.hasNext()) {
+            if(iterator.next().equals("patients")) {
+                equal = true;
+                break;
+            }
+        }
+        if(!equal)
+            database.createCollection("patients");
+
+        MongoCollection<Document> collection = database.getCollection("patients");
+
+        Document patientOld = collection.find(Filters.eq("identifier", arr[0])).first();
+
+        ObjectId patientId = new ObjectId();
+        if(patientOld != null) {
+            patientId = (ObjectId) patientOld.get("_id");
+        }
 
         System.out.println("Currently uploading to database...");
         try (InputStream streamToUploadFrom = filePart.getInputStream()) {
             GridFSUploadOptions options = new GridFSUploadOptions()
                     .chunkSizeBytes(1048576) //1mb
                     .metadata(new Document("type", fileName)
-                            .append("patientId", patientId.toHexString()) //connection to patient object
-                            .append("vioId", vioId.toHexString())); //connection to vio
+                            .append("patientId", patientId) //connection to patient object
+                            .append("vioId", vioId)); //connection to vio
             fileId = gridFSBucket.uploadFromStream(fileName, streamToUploadFrom, options);
             System.out.println("The file id of the uploaded file is: " + fileId.toHexString());
         } catch (Exception e) {
@@ -124,8 +155,8 @@ public class HelloServlet extends HttpServlet {
 
         System.out.println("Beginning extraction of header-data...");
         //EXTRACTION OF HEADER DATA
-        Document patientinfo = new Document().append("_id", patientId.toHexString());
-        Document vio = new Document().append("_id", vioId.toHexString());
+        Document patientinfo = new Document().append("_id", patientId);
+        Document vio = new Document().append("_id", vioId);
 
         GZIPInputStream in = new GZIPInputStream(gridFSBucket.openDownloadStream(fileId).batchSize(1)); //1mb, only first chunk is read
 
@@ -146,35 +177,42 @@ public class HelloServlet extends HttpServlet {
         }
 
         try {
-            System.out.println("Connecting to \"patients\" database...");
-            database = client.getDatabase("patients");
+            patientinfo.append("identifier", arr[0]);
 
-            MongoIterable<String> iterable = database.listCollectionNames();
-            Iterator<String> iterator = iterable.iterator();
+            if(patientOld == null) {
+                patientinfo.append("sample_1", fileId); //connection to sample
+                patientinfo.append("samples_amount", 1);
+                collection.insertOne(patientinfo);
+            } else {
+                int amount = patientOld.getInteger("samples_amount");
+                amount++;
+                for (int i = 1; i < amount; i++) {
+                    patientinfo.append("sample_" + i, patientOld.get("sample_" + i));
+                }
+                patientinfo.append("sample_" + amount, fileId);
+                patientinfo.append("samples_amount", amount);
+                patientinfo.append("_id", patientOld.get("_id"));
+                collection.replaceOne(Filters.eq("identifier", arr[0]), patientinfo);
+            }
 
-            String[] arr = fileName.split("\\.");
-            //patient-object automatically created when not yet existing
-            boolean equal = false;
+            System.out.println("Connecting to \"vios\" collection...");
+
+            //vios-collection automatically created when not yet existing
+            iterable = database.listCollectionNames();
+            iterator = iterable.iterator();
+            equal = false;
             while(iterator.hasNext()) {
-                if(iterator.next().equals(arr[0])) {
+                if(iterator.next().equals("vios")) {
                     equal = true;
                     break;
                 }
             }
             if(!equal)
-                database.createCollection(arr[0]);
+                database.createCollection("vios");
+            collection = database.getCollection("vios");
 
-            MongoCollection<Document> collection = database.getCollection(arr[0]);
-
-            patientinfo.append("sampleinfo", fileId.toHexString()); //connection to sample
-            collection.insertOne(patientinfo);
-
-            System.out.println("Connecting to \"vios\" database...");
-            database = client.getDatabase("vios");
-
-            if(!equal)
-                database.createCollection(arr[0]);
-            collection = database.getCollection(arr[0]);
+            //Document oldVio = collection.find(Filters.and(Filters.eq("db_version", vio.get("db_version")),
+            //        Filters.eq("HIS_version", vio.get("HIS_version")))).first();
 
             collection.insertOne(vio);
 

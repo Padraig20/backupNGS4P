@@ -21,7 +21,7 @@ public class PrintingServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("samples");
+        MongoDatabase database = client.getDatabase("database");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
 
         counter = 0;
@@ -32,7 +32,6 @@ public class PrintingServlet extends HttpServlet {
 
         out.println("<html><body>");
 
-        //out.println("<script> window.location.reload(); </script>");
         gridFSBucket.find().forEach(new Consumer<GridFSFile>() {
             @Override
             public void accept(final GridFSFile gridFSFile) {
@@ -42,22 +41,8 @@ public class PrintingServlet extends HttpServlet {
                         "&emsp; <b>size:</b> &emsp;" + gridFSFile.getLength() + " Byte<br>" +
                         "&emsp; <b>ID:</b> &emsp;&ensp;" + gridFSFile.getObjectId() + "</p>");
 
-                //out.println("<p>" + gridFSFile.getMetadata() + "</p>");
-
                 String href = "/MongoCat_war_exploded/download/?load=" + gridFSFile.getFilename();
                 out.println("<button onclick=\"location = '" + href + "'\">Download</button>\n");
-                href = "/MongoCat_war_exploded/delete/?load=" + gridFSFile.getObjectId();
-                out.println("<button onclick=\"location = '" + href + "'\">Delete</button>\n");
-
-                out.println("<br>");
-
-                //rename form
-                String[] temp = gridFSFile.getFilename().split("\\.");
-                out.println("<form action=\"/MongoCat_war_exploded/rename/=" + gridFSFile.getObjectId() + "=" + temp[1] + "=\">\n" +
-                        "  <label for=\"name\"></label>\n" +
-                        "  <input type=\"name\" id=\"name\" name=\"name\">\n" +
-                        "  <button id=\"connect\">Rename</button>" +
-                        "</form>");
 
                 out.println("<hr>");
             }

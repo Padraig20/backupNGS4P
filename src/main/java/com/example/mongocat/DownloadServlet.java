@@ -41,7 +41,7 @@ public class DownloadServlet extends HttpServlet {
         String[] arr = url.split("=");
 
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("samples");
+        MongoDatabase database = client.getDatabase("database");
 
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
 

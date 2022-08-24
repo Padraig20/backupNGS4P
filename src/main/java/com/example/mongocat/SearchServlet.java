@@ -27,10 +27,9 @@ public class SearchServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         MongoClient client = MongoClients.create("mongodb://localhost:27017");
-        MongoDatabase database = client.getDatabase("samples");
+        MongoDatabase database = client.getDatabase("database");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
         database.createCollection("test");
-        //MongoCollection<Document> test= database.getCollection("test");
 
         response.setContentType("text/html");
 
@@ -43,9 +42,6 @@ public class SearchServlet extends HttpServlet {
         out.println("<h4>Following files have been found regarding '" + arr[1] + "': </h4>");
 
         counter = 0;
-
-        TextSearchOptions opt = new TextSearchOptions();
-        opt.caseSensitive(false);
 
         Bson query = Filters.eq("filename", arr[1]);
         Bson sort = Sorts.ascending("filename");
@@ -61,18 +57,6 @@ public class SearchServlet extends HttpServlet {
                                 "&emsp; <b>ID:</b> &emsp;&ensp;" + gridFSFile.getObjectId() + "</p>");
                         String href = "/MongoCat_war_exploded/download/?load=" + gridFSFile.getFilename();
                         out.println("<button onclick=\"location = '" + href + "'\">Download</button>\n");
-                        href = "/MongoCat_war_exploded/delete/?load=" + gridFSFile.getObjectId();
-                        out.println("<button onclick=\"location = '" + href + "'\">Delete</button>\n");
-
-                        out.println("<br>");
-
-                        //rename form
-                        String[] temp = gridFSFile.getFilename().split("\\.");
-                        out.println("<form action=\"/MongoCat_war_exploded/rename/=" + gridFSFile.getObjectId() + "=" + temp[1] + "=\">\n" +
-                                "  <label for=\"name\"></label>\n" +
-                                "  <input type=\"name\" id=\"name\" name=\"name\">\n" +
-                                "  <button id=\"connect\">Rename</button>" +
-                                "</form>");
 
                         out.println("<hr>");
                     }
