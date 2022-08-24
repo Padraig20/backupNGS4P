@@ -3,6 +3,7 @@ package com.example.mongocat;
 import com.mongodb.client.*;
 import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSBuckets;
+import com.mongodb.client.gridfs.GridFSDownloadStream;
 import com.mongodb.client.gridfs.model.GridFSUploadOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.result.InsertOneResult;
@@ -13,6 +14,9 @@ import com.mongodb.client.model.Filters;
 
 import java.io.*;
 import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
 import javax.servlet.annotation.*;
@@ -100,11 +104,8 @@ public class HelloServlet extends HttpServlet {
         MongoDatabase database = client.getDatabase("samples");
         GridFSBucket gridFSBucket = GridFSBuckets.create(database);
 
-
+        //create IDs
         ObjectId fileId = new ObjectId();
-
-        System.out.println("BEFORE: " + fileId);
-
         ObjectId patientId = new ObjectId();
         ObjectId vioId = new ObjectId();
 
@@ -123,16 +124,22 @@ public class HelloServlet extends HttpServlet {
 
         System.out.println("Beginning extraction of header-data...");
         //EXTRACTION OF HEADER DATA
+        Document patientinfo = new Document().append("_id", patientId.toHexString());
+        Document vio = new Document().append("_id", vioId.toHexString());
 
-        InputStream in = gridFSBucket.openDownloadStream(fileId).batchSize(1); //1mb, first chunk
-        StringBuilder sb = new StringBuilder();
+        GZIPInputStream in = new GZIPInputStream(gridFSBucket.openDownloadStream(fileId).batchSize(1)); //1mb, only first chunk is read
 
         try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-            String temp = br.readLine();
-            while (temp.charAt(0) == '#' && temp.charAt(1) == '#') {
-                sb.append(temp.substring(2));
-                sb.append("\n");
-                temp = br.readLine();
+            String line = br.readLine();
+            while (line.charAt(0) == '#' && line.charAt(1) == '#') {
+                String todo = line.substring(2);
+                String[] info = todo.split("=");
+                if(info[0].equals("db_version") || info[0].equals("HIS_version"))
+                    vio.append(info[0], info[1]);
+                else if(info[0].equals("lName") || info[0].equals("fName") || info[0].equals("address"))
+                    patientinfo.append(info[0], info[1]);
+                //goto next line
+                line = br.readLine();
             }
         } catch (IOException e) {
             System.err.println("The header extraction failed: " + e.getMessage());
@@ -159,8 +166,6 @@ public class HelloServlet extends HttpServlet {
 
             MongoCollection<Document> collection = database.getCollection(arr[0]);
 
-            Document patientinfo = new Document().append("_id", patientId.toHexString());
-            patientinfo.append("input", sb.toString());
             patientinfo.append("sampleinfo", fileId.toHexString()); //connection to sample
             collection.insertOne(patientinfo);
 
@@ -171,8 +176,6 @@ public class HelloServlet extends HttpServlet {
                 database.createCollection(arr[0]);
             collection = database.getCollection(arr[0]);
 
-            Document vio = new Document().append("_id", vioId.toHexString());
-            vio.append("info", sb.toString());
             collection.insertOne(vio);
 
             System.out.println("All successful...");
